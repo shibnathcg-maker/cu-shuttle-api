@@ -19,10 +19,16 @@ class PredictionService:
             
             if os.path.exists(delay_path):
                 self.delay_model = joblib.load(delay_path)
+                print("✅ Delay model loaded")
+            else:
+                print("⚠️ Delay model file not found")
+                
             if os.path.exists(risk_path):
                 self.risk_model = joblib.load(risk_path)
+                print("✅ Risk model loaded")
+            else:
+                print("⚠️ Risk model file not found")
                 
-            print("✅ Prediction models loaded successfully")
         except Exception as e:
             print(f"❌ Model loading error: {e}")
             self.delay_model = None
@@ -33,8 +39,7 @@ class PredictionService:
             if self.delay_model is None:
                 return self._dummy_delay_prediction(train_id, hour)
 
-            # Prepare features (adjust based on your actual model)
-            features = np.array([[hour, 1 if day_type == "weekday" else 0]])
+            features = np.array([[hour, 1 if day_type.lower() == "weekday" else 0]])
             delay_minutes = float(self.delay_model.predict(features)[0])
             delay_minutes = max(0, round(delay_minutes, 1))
 
@@ -54,7 +59,7 @@ class PredictionService:
             if self.risk_model is None:
                 return self._dummy_risk_prediction(stop_name, hour)
 
-            features = np.array([[hour, hash(stop_name) % 20, 1 if day_type == "weekday" else 0]])
+            features = np.array([[hour, hash(stop_name) % 20, 1 if day_type.lower() == "weekday" else 0]])
             risk_score = float(self.risk_model.predict(features)[0])
             risk_score = max(15, min(92, round(risk_score, 1)))
 
@@ -84,7 +89,7 @@ class PredictionService:
 
     def _dummy_risk_prediction(self, stop_name: str, hour: int):
         base_risk = 40 + (hour % 12) * 4.5
-        if any(x in stop_name for x in ["ফতেয়াবাদ", "বটতলী", "ঝাউতলা"]):
+        if any(x in stop_name for x in ["ফতেয়াবাদ", "বটতলী", "ঝাউতলা", "চৌধুরী হাট"]):
             base_risk += 28
         risk_score = round(max(22, min(90, base_risk)), 1)
         

@@ -12,88 +12,78 @@ class PredictionService:
     def load_models(self):
         try:
             model_dir = "app/ml_models"
-            delay_path = f"{model_dir}/delay_model.pkl"
-            risk_path = f"{model_dir}/risk_model.pkl"
-
-            if os.path.exists(delay_path):
-                self.delay_model = joblib.load(delay_path)
+            if os.path.exists(f"{model_dir}/delay_model.pkl"):
+                self.delay_model = joblib.load(f"{model_dir}/delay_model.pkl")
                 print("✅ Delay model loaded")
             else:
-                print("⚠️ Delay model file not found")
+                print("⚠️ Delay model not found - using dummy")
 
-            if os.path.exists(risk_path):
-                self.risk_model = joblib.load(risk_path)
+            if os.path.exists(f"{model_dir}/risk_model.pkl"):
+                self.risk_model = joblib.load(f"{model_dir}/risk_model.pkl")
                 print("✅ Risk model loaded")
             else:
-                print("⚠️ Risk model file not found")
+                print("⚠️ Risk model not found - using dummy")
         except Exception as e:
-            print(f"❌ Model load error: {e}")
+            print(f"❌ Model loading failed: {e}")
 
     def predict_delay(self, train_id: str, hour: int, day_type: str = "weekday"):
         try:
             if self.delay_model is None:
-                return self._dummy_delay_prediction(train_id, hour)
-
+                return self._dummy_delay(train_id, hour)
+            
             features = np.array([[float(hour), 1 if day_type.lower() == "weekday" else 0]])
-            delay_minutes = float(self.delay_model.predict(features)[0])
-            delay_minutes = max(0, round(delay_minutes, 1))
-
+            delay = float(self.delay_model.predict(features)[0])
+            delay = max(0, round(delay, 1))
+            
             return {
                 "train_id": train_id,
-                "predicted_delay": delay_minutes,
-                "status": "Delayed" if delay_minutes > 5 else "On Time",
-                "confidence": "Medium",
-                "note": "⚠️ এই Delay Prediction সম্পূর্ণ সিন্থেটিক ডেটা দিয়ে তৈরি মডেলের উপর ভিত্তি করে। বাস্তব সময়ের সাথে পার্থক্য থাকতে পারে।"
+                "predicted_delay": delay,
+                "status": "Delayed" if delay > 5 else "On Time",
+                "note": "⚠️ এই Delay Prediction সিন্থেটিক ডেটা দিয়ে তৈরি। বাস্তব সময়ের সাথে পার্থক্য থাকতে পারে।"
             }
-        except Exception as e:
-            print(f"Delay prediction error: {e}")
-            return self._dummy_delay_prediction(train_id, hour)
+        except:
+            return self._dummy_delay(train_id, hour)
 
     def predict_risk(self, stop_name: str, hour: int, day_type: str = "weekday"):
         try:
             if self.risk_model is None:
-                return self._dummy_risk_prediction(stop_name, hour)
-
+                return self._dummy_risk(stop_name, hour)
+            
             features = np.array([[float(hour), hash(stop_name) % 20, 1 if day_type.lower() == "weekday" else 0]])
-            risk_score = float(self.risk_model.predict(features)[0])
-            risk_score = max(20, min(90, round(risk_score, 1)))
-
-            risk_level = "High" if risk_score > 65 else "Medium" if risk_score > 40 else "Low"
-
+            risk = float(self.risk_model.predict(features)[0])
+            risk = max(20, min(90, round(risk, 1)))
+            
+            level = "High" if risk > 65 else "Medium" if risk > 40 else "Low"
+            
             return {
                 "stop_name": stop_name,
-                "risk_score": risk_score,
-                "risk_level": risk_level,
-                "peak_hours": "সকাল ৭-৯টা ও বিকেল ৪-৬টায় ঝুঁকি বেশি",
-                "note": "⚠️ এই Risk Prediction সম্পূর্ণ সিন্থেটিক ডেটার উপর ভিত্তি করে তৈরি। এটি শুধু সচেতনতার জন্য, বাস্তব তথ্য নয়।"
+                "risk_score": risk,
+                "risk_level": level,
+                "note": "⚠️ এই Risk Prediction সিন্থেটিক ডেটা দিয়ে তৈরি। শুধু সচেতনতার জন্য।"
             }
-        except Exception as e:
-            print(f"Risk prediction error: {e}")
-            return self._dummy_risk_prediction(stop_name, hour)
+        except:
+            return self._dummy_risk(stop_name, hour)
 
-    def _dummy_delay_prediction(self, train_id: str, hour: int):
-        delay_minutes = round((hour % 9) * 3.5, 1)
+    def _dummy_delay(self, train_id: str, hour: int):
+        delay = round((hour % 9) * 3.5, 1)
         return {
             "train_id": train_id,
-            "predicted_delay": delay_minutes,
-            "status": "Delayed" if delay_minutes > 8 else "On Time",
-            "confidence": "Low",
-            "note": "⚠️ এই Delay Prediction সম্পূর্ণ সিন্থেটিক ডেটা দিয়ে তৈরি মডেলের উপর ভিত্তি করে। বাস্তব সময়ের সাথে পার্থক্য থাকতে পারে।"
+            "predicted_delay": delay,
+            "status": "Delayed" if delay > 8 else "On Time",
+            "note": "⚠️ এই Delay Prediction সিন্থেটিক ডেটা দিয়ে তৈরি। বাস্তব সময়ের সাথে পার্থক্য থাকতে পারে।"
         }
 
-    def _dummy_risk_prediction(self, stop_name: str, hour: int):
-        base = 42 + (hour % 12) * 4.8
-        if any(word in stop_name for word in ["ফতেয়াবাদ", "বটতলী", "ঝাউতলা", "চৌধুরী হাট"]):
-            base += 30
-        risk_score = round(max(25, min(88, base)), 1)
-        risk_level = "High" if risk_score > 65 else "Medium" if risk_score > 40 else "Low"
-        
+    def _dummy_risk(self, stop_name: str, hour: int):
+        base = 45 + (hour % 12) * 4
+        if any(x in stop_name for x in ["ফতেয়াবাদ", "বটতলী", "ঝাউতলা"]):
+            base += 25
+        risk = round(max(25, min(85, base)), 1)
+        level = "High" if risk > 65 else "Medium" if risk > 40 else "Low"
         return {
             "stop_name": stop_name,
-            "risk_score": risk_score,
-            "risk_level": risk_level,
-            "peak_hours": "সকাল ৭-৯টা ও বিকেল ৪-৬টায় ঝুঁকি বেশি",
-            "note": "⚠️ এই Risk Prediction সম্পূর্ণ সিন্থেটিক ডেটার উপর ভিত্তি করে তৈরি। এটি শুধু সচেতনতার জন্য, বাস্তব তথ্য নয়।"
+            "risk_score": risk,
+            "risk_level": level,
+            "note": "⚠️ এই Risk Prediction সিন্থেটিক ডেটা দিয়ে তৈরি। শুধু সচেতনতার জন্য।"
         }
 
 
